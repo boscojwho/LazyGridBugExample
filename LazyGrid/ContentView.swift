@@ -22,8 +22,11 @@ enum ContentType: CaseIterable, Identifiable, CustomStringConvertible {
 }
 
 struct ContentView: View {
-    let alphabet = Array("abcdefghijklmnopqrstuvwxyz")
-    let numbers = Array("123456789")
+//    let alphabet = Array("abcdefghijklmnopqrstuvwxyz")
+//    let numbers = Array("123456789")
+    /// Bug persists even when backing data is processed on init.
+    let alphabet = Array(Array("abcdefghijklmnopqrstuvwxyz").enumerated())
+    let numbers = Array(Array("123456789").enumerated())
     
     @State private var selectedContent: ContentType = .alphabet
     @State private var showAlert = false
@@ -40,7 +43,7 @@ struct ContentView: View {
                 pinnedViews: []
             ) {
                 Group {
-                    ForEach(Array(items.enumerated()), id: \.element.hashValue) { offset, item in
+                    ForEach(items, id: \.element.hashValue) { offset, item in
                         GroupBox {
                             VStack {
                                 LabeledContent(String(item), value: "\(offset)")
@@ -49,6 +52,7 @@ struct ContentView: View {
                                 Button("Alert") {
                                     showAlert = true
                                 }
+                                /// Bug: Captured data value is incorrect, and changes on each invocation.
                                 .alert("Alert: \(String(item)), \(offset)", isPresented: $showAlert) {
                                     Button("Dismiss") {
                                         print("dismissed item \(String(item)) at offset \(offset)")
@@ -57,11 +61,13 @@ struct ContentView: View {
                                 Button("Alert -> P?") {
                                     showAlertWithPresenting = true
                                 }
+                                /// Bug: Captured data value is incorrect, and changes on each invocation.
                                 .alert("Alert: \(String(item)), \(offset)", isPresented: $showAlertWithPresenting, presenting: (offset, item)) { value in
                                     Button("Dismiss") {
                                         print("dismissed presenting item \(String(item)) at offset \(offset)")
                                     }
                                 }
+                                /// This method works when the `.alert` modifier is moved outside of LazyVGrid's content builder.
                                 Button("Alert -> State") {
                                     showAlertWithState = true
                                     alertItem = (offset, String(item))
@@ -79,6 +85,7 @@ struct ContentView: View {
             }
         }
         .animation(.default, value: selectedContent)
+        /// Note: `onChange` modifier is called after view body is re-evaluated.
         .onChange(of: selectedContent, initial: true) { oldValue, newValue in
             print("selectedContent: \(oldValue.description) -> \(newValue.description)")
         }
@@ -90,6 +97,8 @@ struct ContentView: View {
                 }
             }
         }
+        /// Workaround: Move .alert modifier outside of LazyVGrid content builder, and capture data value using an @State var.
+        /// Note:  This workaround doesn't work if the .alert modifier is applied on a view inside the LazyVGrid's content builder.
         .alert("Alert", isPresented: $showAlertWithState, presenting: alertItem) { value in
             Button("\(value.0), \(value.1)") {
                 print("dismissed state item \(String(value.1)) at offset \(value.0)")
@@ -100,7 +109,7 @@ struct ContentView: View {
         }
     }
     
-    private var items: [String.Element] {
+    private var items: [(offset: Int, element: String.Element)] {
         switch selectedContent {
         case .alphabet:
             alphabet
